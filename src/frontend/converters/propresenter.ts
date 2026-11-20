@@ -585,6 +585,9 @@ function RTFToText(input: string): string {
     input = input.replaceAll("\\part", "\\remove")
     input = input.replaceAll("\\par", "__BREAK__")
     input = input.replaceAll("\\\n", "__BREAK__")
+    // A bare newline directly before a control word (e.g. between font-size runs: "D\n\fs156 r") is
+    // just whitespace in RTF, not a line break, so it must not split words apart.
+    input = input.replace(/\n(?=\\)/g, "")
     input = input.replaceAll("\n", "__BREAK__")
     input = input.replaceAll("\\u8232", "__BREAK__")
 
@@ -734,6 +737,14 @@ function convertProToSlides(song: any): ConvertedShow {
             const allSlides = group.slides.map((id: string, i: number) => createSlide(id, i === 0, { color: group.color, name: group.name }))
             if (allSlides.length > 1) {
                 slides[allSlides[0].id].children = allSlides.slice(1).map(({ id }: SlideData) => id)
+
+                // child slides' backgrounds/disabled state live on the parent's layout entry, not in the layout list
+                allSlides.slice(1).forEach(({ id, background, disabled }: SlideData) => {
+                    if (!background && !disabled) return
+
+                    if (!allSlides[0].children) allSlides[0].children = {}
+                    allSlides[0].children[id] = { ...(background ? { background } : {}), ...(disabled ? { disabled: true } : {}) }
+                })
             }
 
             layoutSlides.push(allSlides[0])
